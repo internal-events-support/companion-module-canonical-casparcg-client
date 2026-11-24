@@ -1,14 +1,14 @@
 {
 	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
 	"type": "connection",
-	"id": "nerif-tafu-casparcgadvancedclient",
-	"name": "nerif-tafu: CasparCG Advanced Client",
+	"id": "neriftafu-casparcgadvancedclient",
+	"name": "neriftafu: CasparCG Advanced Client",
 	"shortname": "CasparCG Advanced Client",
 	"description": "Runs rundowns, playlists and takes in CasparCG Advanced Client (not the original CasparCG Client)",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-nerif-tafu-casparcgadvancedclient.git",
-	"bugs": "https://github.com/bitfocus/companion-module-nerif-tafu-casparcgadvancedclient/issues",
+	"repository": "git+https://github.com/bitfocus/companion-module-neriftafu-casparcgadvancedclient.git",
+	"bugs": "https://github.com/bitfocus/companion-module-neriftafu-casparcgadvancedclient/issues",
 	"maintainers": [
 		{
 			"name": "internal-events-support",
@@ -22,7 +22,7 @@
 		"entrypoint": "../dist/main.js"
 	},
 	"legacyIds": ["canonical-casparcg-client"],
-	"manufacturer": "nerif-tafu",
+	"manufacturer": "neriftafu",
 	"products": ["CasparCG Advanced Client"],
 	"keywords": ["playout", "video", "graphics", "rundown"]
 }

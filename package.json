@@ -1,5 +1,5 @@
 {
-	"name": "nerif-tafu-casparcgadvancedclient",
+	"name": "neriftafu-casparcgadvancedclient",
 	"version": "1.1.0",
 	"main": "dist/main.js",
 	"type": "module",
@@ -16,7 +16,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/bitfocus/companion-module-nerif-tafu-casparcgadvancedclient.git"
+		"url": "git+https://github.com/bitfocus/companion-module-neriftafu-casparcgadvancedclient.git"
 	},
 	"engines": {
 		"node": "^26",

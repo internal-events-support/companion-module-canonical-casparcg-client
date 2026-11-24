@@ -1,4 +1,4 @@
-# nerif-tafu: CasparCG Advanced Client
+# neriftafu: CasparCG Advanced Client
 
 Controls CasparCG Advanced Client: rundown entries, playlists, takes between channels, and any layer.
 
