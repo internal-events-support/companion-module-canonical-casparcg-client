@@ -1,0 +1,28 @@
+{
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+	"type": "connection",
+	"id": "canonical-casparcg-client",
+	"name": "Canonical: CasparCG Client",
+	"shortname": "CasparCG Client",
+	"description": "Runs rundowns, playlists and takes in CasparCG Client",
+	"version": "0.0.0",
+	"license": "MIT",
+	"repository": "git+https://github.com/bitfocus/companion-module-canonical-casparcg-client.git",
+	"bugs": "https://github.com/bitfocus/companion-module-canonical-casparcg-client/issues",
+	"maintainers": [
+		{
+			"name": "internal-events-support",
+			"email": ""
+		}
+	],
+	"runtime": {
+		"type": "node26",
+		"api": "nodejs-ipc",
+		"apiVersion": "0.0.0",
+		"entrypoint": "../dist/main.js"
+	},
+	"legacyIds": [],
+	"manufacturer": "Canonical",
+	"products": ["CasparCG Client"],
+	"keywords": ["playout", "video", "graphics", "rundown"]
+}
