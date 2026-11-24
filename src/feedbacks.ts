@@ -1,11 +1,11 @@
 import { combineRgb, type DropdownChoice } from '@companion-module/base'
 import { channelField, entryField, layerField, listIds, serverField } from './choices.js'
 import type ModuleInstance from './main.js'
-import type { PlayState } from './state.js'
+import { labelOf, type PlayState } from './state.js'
 
 type LayerOptions = {
 	server: string
-	channel: number
+	channel: string | number
 	layer: number
 }
 
@@ -19,6 +19,12 @@ export type FeedbacksSchema = {
 	}
 	entry_used: {
 		type: 'boolean'
+		options: {
+			entry: string
+		}
+	}
+	entry_label: {
+		type: 'value'
 		options: {
 			entry: string
 		}
@@ -53,6 +59,13 @@ export type FeedbacksSchema = {
 			property: string
 		}
 	}
+	overlay_on: {
+		type: 'boolean'
+		options: {
+			server: string
+			channel: string | number
+		}
+	}
 	server_connected: {
 		type: 'boolean'
 		options: {
@@ -76,6 +89,7 @@ const STATES: (DropdownChoice<string> & { id: PlayState })[] = [
 
 const PROPERTIES: DropdownChoice<string>[] = [
 	{ id: 'name', label: 'Clip name' },
+	{ id: 'channel', label: 'Channel number and name' },
 	{ id: 'state', label: 'State' },
 	{ id: 'left', label: 'Time left' },
 	{ id: 'seconds', label: 'Time left in seconds, as a number' },
@@ -97,9 +111,17 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 		expressionDescription: listIds(STATES),
 	} as const
 	const server = serverField(self)
-	const place = [server, channelField('channel', 'Channel', 1), layerField('layer', 'Layer', 10)]
-	const layer = (o: LayerOptions) =>
-		self.state.layerInfo({ device: self.state.server(o.server), channel: o.channel, layer: o.layer })
+	const channel = channelField(self, 'channel', 'Channel', 1)
+	const place = [server, channel, layerField('layer', 'Layer', 10)]
+	const at = (o: { server: string; channel: string | number }) => {
+		const device = self.state.server(o.server)
+		const channel = self.state.channel(device, o.channel)
+		return channel === undefined ? null : { device, channel }
+	}
+	const layer = (o: LayerOptions) => {
+		const place = at(o)
+		return place && self.state.layerInfo({ ...place, layer: o.layer })
+	}
 
 	self.setFeedbackDefinitions({
 		entry_state: {
@@ -124,6 +146,17 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				return !!found && self.state.entryUsed(found)
 			},
 		},
+		entry_label: {
+			type: 'value',
+			name: 'Rundown: label of an entry',
+			sortName: 'Rundown 4',
+			description: 'For buttons that choose an entry by its remote ID.',
+			options: [entry],
+			callback: ({ options }) => {
+				const found = self.state.find(options.entry)
+				return found ? labelOf(found.entry) : options.entry
+			},
+		},
 		entry_left: {
 			type: 'value',
 			name: 'Rundown: time left on an entry',
@@ -143,7 +176,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			description: 'Only videos and audio can be loaded or ended. Anything else is playing or paused.',
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [...place, state],
-			callback: ({ options }) => layer(options).state === options.state,
+			callback: ({ options }) => layer(options)?.state === options.state,
 		},
 		layer_clip: {
 			type: 'boolean',
@@ -163,7 +196,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			],
 			callback: ({ options }) => {
 				const want = options.name.trim().toLowerCase()
-				return want !== '' && layer(options).name.toLowerCase() === want
+				return want !== '' && layer(options)?.name.toLowerCase() === want
 			},
 		},
 		layer_left: {
@@ -177,8 +210,8 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				{ id: 'seconds', type: 'number', label: 'Seconds', default: 10, min: 1, max: 3600, clampValues: true },
 			],
 			callback: ({ options }) => {
-				const { seconds, counting } = layer(options)
-				return counting && seconds !== null && seconds <= options.seconds
+				const info = layer(options)
+				return !!info?.counting && info.seconds !== null && info.seconds <= options.seconds
 			},
 		},
 		layer_value: {
@@ -198,6 +231,8 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			],
 			callback: ({ options }) => {
 				const info = layer(options)
+				const place = at(options)
+				if (!info || !place) return options.property === 'channel' ? String(options.channel) : ''
 				switch (options.property) {
 					case 'name':
 					case 'state':
@@ -209,9 +244,22 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 					case 'playlist':
 					case 'clip':
 						return info[options.property]
+					case 'channel':
+						return self.state.channelText(place.device, place.channel)
 					default:
 						return ''
 				}
+			},
+		},
+		overlay_on: {
+			type: 'boolean',
+			name: 'Channel: playback overlay is showing',
+			sortName: 'Layer 5',
+			defaultStyle: { bgcolor: GREEN, color: WHITE },
+			options: [server, channel],
+			callback: ({ options }) => {
+				const place = at(options)
+				return !!place && self.state.overlayOn(place.device, place.channel)
 			},
 		},
 		server_connected: {

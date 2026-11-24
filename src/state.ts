@@ -24,6 +24,8 @@ export type Layer = {
 	paused: boolean
 	loop: boolean
 	next: string
+	/** A playback overlay of the client. */
+	overlay?: boolean
 }
 export type Deck = {
 	device: string
@@ -42,13 +44,18 @@ export type LiveState = {
 	items: Record<string, { state: string; used: boolean }>
 }
 
-export type ClientSettings = { devices?: { name: string; shadow: boolean }[] }
+type ChannelSettings = { name?: string; overlay?: { on?: boolean; layer?: number } }
+export type ClientSettings = {
+	devices?: { name: string; shadow: boolean; channels?: Record<string, ChannelSettings> }[]
+}
 
 export type PlayState = 'playing' | 'paused' | 'loaded' | 'ended' | 'empty'
 export type Place = { device: string; channel: number; layer: number }
 export type Found = { entry: Entry; parent: Entry | null; rundown: Rundown }
 
 const EMPTY: LiveState = { devices: [], layers: {}, decks: [], items: {} }
+/** Something that stays on a layer this long is there to stay. */
+const SETTLED = 5000
 const TIMED = ['MOVIE', 'AUDIO', 'PLAYLIST']
 /** Entries that put one thing on one layer. */
 export const ON_LAYER = [
@@ -100,6 +107,11 @@ export function layerState(l: Layer | undefined): PlayState {
 	return 'playing'
 }
 
+function nameOf(l: Layer): string {
+	if (l.overlay) return 'Playback overlay'
+	return short(l.name) || PRODUCERS[l.producer] || l.producer
+}
+
 export type LayerInfo = {
 	state: PlayState
 	name: string
@@ -121,6 +133,11 @@ export class ClientState {
 	version = ''
 	/** Servers that repeat what rundown entries send. */
 	shadows: string[] = []
+	#channels = new Map<string, Record<string, ChannelSettings>>()
+	/** Layers that have had something on them, so that their presets do not come and go. */
+	#seen = new Map<number, Set<number>>()
+	#seenOn = ''
+	#since = new Map<string, number>()
 	#entries: Found[] | null = null
 	#names = new Map<string, Found>()
 
@@ -129,6 +146,9 @@ export class ClientState {
 		this.live = EMPTY
 		this.version = ''
 		this.shadows = []
+		this.#channels.clear()
+		this.#seen.clear()
+		this.#since.clear()
 		this.#entries = null
 	}
 
@@ -138,7 +158,71 @@ export class ClientState {
 	}
 
 	setSettings(settings: ClientSettings): void {
-		this.shadows = (settings.devices ?? []).filter((d) => d.shadow).map((d) => d.name)
+		const servers = settings.devices ?? []
+		this.shadows = servers.filter((d) => d.shadow).map((d) => d.name)
+		this.#channels = new Map(servers.map((d) => [d.name, d.channels ?? {}]))
+	}
+
+	channelName(server: string, channel: number): string {
+		return this.#channels.get(server)?.[channel]?.name ?? ''
+	}
+
+	/** "2 Stage", or just the number when it has no name. */
+	channelText(server: string, channel: number): string {
+		return [String(channel), this.channelName(server, channel)].filter(Boolean).join(' ')
+	}
+
+	/** A channel by its number or its name. */
+	channel(server: string, ref: string | number): number | undefined {
+		const n = Math.round(Number(ref))
+		if (String(ref).trim() !== '' && n > 0) return n
+		const want = String(ref).trim().toLowerCase()
+		const named = Object.entries(this.#channels.get(server) ?? {})
+		const hit = named.find(([, c]) => want !== '' && c.name?.trim().toLowerCase() === want)
+		return hit ? Number(hit[0]) : undefined
+	}
+
+	/** Changes when a channel's name or overlay does. */
+	channelKey(): string {
+		return JSON.stringify([...this.#channels])
+	}
+
+	/** Turned on, and there. */
+	overlayOn(server: string, channel: number): boolean {
+		if (!this.#channels.get(server)?.[channel]?.overlay?.on) return false
+		// It is turned on, but it may have been cleared since.
+		const start = `${server}|${channel}-`
+		return Object.entries(this.live.layers).some(([key, l]) => l.overlay && key.startsWith(start))
+	}
+
+	/** Layers of the first server that rundowns use or that have something on them, with the channels they are on. */
+	layersInUse(): Map<number, number[]> {
+		const server = this.server()
+		if (server !== this.#seenOn) this.#seen.clear()
+		this.#seenOn = server
+		const found = new Map([...this.#seen].map(([layer, channels]) => [layer, new Set(channels)]))
+		const add = (channel: number, layer: number) => found.set(layer, (found.get(layer) ?? new Set()).add(channel))
+		for (const { entry, parent } of this.entries()) {
+			const here = this.server(entry.device) === server && parent?.type !== 'PLAYLIST'
+			if (here && (ON_LAYER.includes(entry.type) || entry.type === 'PLAYLIST')) add(entry.channel, entry.layer)
+		}
+		for (const [key, layer] of Object.entries(this.live.layers)) {
+			const bar = key.lastIndexOf('|')
+			const [channel, n] = key
+				.slice(bar + 1)
+				.split('-')
+				.map(Number)
+			const used = key.slice(0, bar) === server && layer.producer !== 'empty' && !layer.overlay
+			const since = this.#since.get(key) ?? Date.now()
+			if (used) this.#since.set(key, since)
+			else this.#since.delete(key)
+			// Not for a moment, as during a fade.
+			if (!used || Date.now() - since < SETTLED) continue
+			add(channel, n)
+			this.#seen.set(n, (this.#seen.get(n) ?? new Set()).add(channel))
+		}
+		const sorted = [...found].sort((a, b) => a[0] - b[0])
+		return new Map(sorted.map(([layer, channels]) => [layer, [...channels].sort((a, b) => a - b)]))
 	}
 
 	setRundowns(all: RundownPut[]): void {
@@ -187,6 +271,17 @@ export class ClientState {
 		return out
 	}
 
+	/** Everything that can have a used mark, which is more than can be played from here. */
+	markable(): { entry: Entry; parent: Entry | null }[] {
+		const all = this.rundowns.flatMap((r) =>
+			r.items.flatMap((entry) => [
+				{ entry, parent: null },
+				...(entry.items ?? []).map((child) => ({ entry: child, parent: entry })),
+			]),
+		)
+		return all.filter((m) => m.entry.type !== 'SEPARATOR')
+	}
+
 	/** By remote ID, or else by label. */
 	find(ref: string): Found | undefined {
 		this.entries()
@@ -216,7 +311,7 @@ export class ClientState {
 		const length = timed ? Math.max(left, Math.ceil(l.end - l.start - 0.05)) : 0
 		return {
 			state,
-			name: l && l.producer !== 'empty' ? short(l.name) || PRODUCERS[l.producer] || l.producer : '',
+			name: l && l.producer !== 'empty' ? nameOf(l) : '',
 			left: timed ? clock(left) : '',
 			seconds: timed ? left : null,
 			counting: timed && state === 'playing' && !l.loop,
@@ -254,6 +349,10 @@ export class ClientState {
 
 	entryUsed(f: Found): boolean {
 		return !!this.live.items[f.entry.id]?.used
+	}
+
+	allUsed(ids: string[]): boolean {
+		return ids.every((id) => this.live.items[id]?.used)
 	}
 
 	/** Time left on the clip, when the entry is what is on its layer. */

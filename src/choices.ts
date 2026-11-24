@@ -20,15 +20,20 @@ function serverChoices(self: ModuleInstance): DropdownChoice<string>[] {
 	]
 }
 
-/** Everything the dropdowns and presets are made from, to tell when they have to be made again. */
+/** What the dropdowns are made from, to tell when they have to be made again. */
 export function choiceKey(self: ModuleInstance): string {
-	const { rundowns, live } = self.state
+	return JSON.stringify([entryChoices(self), serverChoices(self), channelChoices(self)])
+}
+
+/** The same for the presets. */
+export function presetKey(self: ModuleInstance): string {
+	const { state } = self
 	return JSON.stringify([
-		entryChoices(self),
-		self.state.reachable().map((f) => f.entry.type),
-		serverChoices(self),
-		rundowns.map((r) => [r.id, r.name]),
-		live.devices[0]?.channels.length,
+		choiceKey(self),
+		state.reachable().map((f) => [f.entry.type, f.rundown.id]),
+		state.rundowns.map((r) => [r.id, r.name]),
+		state.live.devices[0]?.channels.length,
+		[...state.layersInUse()],
 	])
 }
 
@@ -60,8 +65,35 @@ export function serverField(self: ModuleInstance): CompanionInputFieldDropdown<'
 	}
 }
 
-export function channelField<K extends string>(id: K, label: string, value: number): CompanionInputFieldNumber<K> {
-	return { id, type: 'number', label, default: value, min: 1, max: 99, asInteger: true }
+/** Channels by number, with their names. Those of other servers are named after the server. */
+function channelChoices(self: ModuleInstance): DropdownChoice<number>[] {
+	const servers = self.state.live.devices
+	const count = Math.max(1, ...servers.map((s) => s.channels.length))
+	return Array.from({ length: count }, (_, k) => {
+		const names = servers.flatMap((s) => {
+			const name = self.state.channelName(s.name, k + 1)
+			return name ? [servers.length > 1 ? `${name} on ${s.name}` : name] : []
+		})
+		return { id: k + 1, label: [String(k + 1), names.join(', ')].filter(Boolean).join(' ') }
+	})
+}
+
+export function channelField<K extends string>(
+	self: ModuleInstance,
+	id: K,
+	label: string,
+	value: number,
+): CompanionInputFieldDropdown<K, string | number> {
+	return {
+		id,
+		type: 'dropdown',
+		label,
+		description: 'Choose one, or type a number or name',
+		choices: channelChoices(self),
+		default: value,
+		allowCustom: true,
+		expressionDescription: 'The number or the name of a channel',
+	}
 }
 
 export function layerField<K extends string>(id: K, label: string, value: number): CompanionInputFieldNumber<K> {

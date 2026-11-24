@@ -1,7 +1,7 @@
 import { isIPv6 } from 'node:net'
 import { InstanceBase, InstanceStatus, type SomeCompanionConfigField } from '@companion-module/base'
 import { UpdateActions, type ActionsSchema } from './actions.js'
-import { choiceKey } from './choices.js'
+import { choiceKey, presetKey } from './choices.js'
 import { GetConfigFields, type ModuleConfig, type ModuleSecrets } from './config.js'
 import { UpdateFeedbacks, type FeedbacksSchema } from './feedbacks.js'
 import { Link, type LinkState } from './link.js'
@@ -41,6 +41,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	/** The client has been read, so what is asked for can be looked up. */
 	#ready = false
 	#choices = ''
+	#presets = ''
 	#shown = ''
 
 	async init(config: ModuleConfig, _isFirstInit: boolean, secrets: ModuleSecrets): Promise<void> {
@@ -69,6 +70,25 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const found = this.state.find(ref)
 		if (!found) throw new Error(`No open rundown has an entry called "${ref}"`)
 		return found.entry.id
+	}
+
+	/** An entry together with what is in it. */
+	entryIds(ref: string): string[] {
+		const id = this.entryId(ref)
+		return this.state.markable().flatMap((m) => (m.entry.id === id || m.parent?.id === id ? [m.entry.id] : []))
+	}
+
+	allIds(): string[] {
+		this.#mustBeReady()
+		return this.state.markable().map((m) => m.entry.id)
+	}
+
+	/** A channel of a server, by its number or its name. */
+	place(server: string, ref: string | number): { device: string; channel: number } {
+		const device = this.serverName(server)
+		const channel = this.state.channel(device, ref)
+		if (channel === undefined) throw new Error(`There is no channel called "${ref}" on ${device}`)
+		return { device, channel }
 	}
 
 	serverName(name: string): string {
@@ -112,7 +132,15 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const shadows = this.state.live.devices.filter((s) => s.connected && this.state.shadows.includes(s.name))
 		const servers = new Set([at.device, ...shadows.map((s) => s.name)])
 		for (const server of servers) {
-			for (const command of commands) await this.command('raw', [server, command], signal)
+			for (const command of commands) {
+				try {
+					await this.command('raw', [server, command], signal)
+				} catch (e) {
+					// A shadow server may not have the channel. What counts is the server that was asked for.
+					if (server === at.device) throw e
+					this.log('debug', `${server}: ${e instanceof Error ? e.message : String(e)}`)
+				}
+			}
 		}
 	}
 
@@ -189,7 +217,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			}
 			case 'settings':
 				this.state.setSettings(args[0] as ClientSettings)
-				return
+				break
 			case 'toast': // what went wrong after an action had been accepted, such as an entry with a delay
 				if (args[1] === 'bad') this.log('warn', String(args[0]))
 				return
@@ -203,7 +231,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	#redefineSoon(): void {
-		if (this.#redefineTimer || this.#choices === choiceKey(this)) return
+		if (this.#redefineTimer || this.#presets === presetKey(this)) return
 		this.#redefineTimer = setTimeout(() => {
 			this.#redefineTimer = null
 			this.#define()
@@ -226,7 +254,16 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			[e.label, e.name, e.remoteId, e.device, e.channel, e.layer],
 		])
 		const rundowns = state.rundowns.map((r) => [r.id, r.name])
-		const shown = JSON.stringify([layers, state.live.decks, state.live.items, state.live.devices, entries, rundowns])
+		const channels = state.channelKey()
+		const shown = JSON.stringify([
+			layers,
+			channels,
+			state.live.decks,
+			state.live.items,
+			state.live.devices,
+			entries,
+			rundowns,
+		])
 		if (shown === this.#shown) return false
 		this.#shown = shown
 		this.#variables.update()
@@ -235,9 +272,13 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	#define(): void {
-		this.#choices = choiceKey(this)
-		UpdateActions(this)
-		UpdateFeedbacks(this)
+		const choices = choiceKey(this)
+		if (choices !== this.#choices) {
+			this.#choices = choices
+			UpdateActions(this)
+			UpdateFeedbacks(this)
+		}
+		this.#presets = presetKey(this)
 		UpdatePresets(this)
 		this.#variables.update()
 	}

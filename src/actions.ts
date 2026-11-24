@@ -15,10 +15,20 @@ export type ActionsSchema = {
 			used: string
 		}
 	}
+	mark_all_unused: {
+		options: Record<string, never>
+	}
+	overlay: {
+		options: {
+			server: string
+			channel: string | number
+			overlay: string
+		}
+	}
 	layer: {
 		options: {
 			server: string
-			channel: number
+			channel: string | number
 			layer: number
 			command: string
 		}
@@ -26,9 +36,9 @@ export type ActionsSchema = {
 	take: {
 		options: {
 			server: string
-			fromChannel: number
+			fromChannel: string | number
 			fromLayer: number
-			toChannel: number
+			toChannel: string | number
 			toLayer: number
 			type: string
 			frames: number
@@ -39,14 +49,14 @@ export type ActionsSchema = {
 	clear_layer: {
 		options: {
 			server: string
-			channel: number
+			channel: string | number
 			layer: number
 		}
 	}
 	clear_channel: {
 		options: {
 			server: string
-			channel: number
+			channel: string | number
 		}
 	}
 	amcp: {
@@ -122,6 +132,7 @@ export function UpdateActions(self: ModuleInstance): void {
 		mark_used: {
 			name: 'Rundown: mark as used or unused',
 			sortName: 'Rundown 2',
+			description: 'A group or playlist is marked together with what is in it.',
 			options: [
 				entry,
 				{
@@ -131,13 +142,57 @@ export function UpdateActions(self: ModuleInstance): void {
 					choices: [
 						{ id: 'used', label: 'Used' },
 						{ id: 'unused', label: 'Unused' },
+						{ id: 'toggle', label: 'Toggle' },
 					],
 					default: 'unused',
-					expressionDescription: 'One of: used, unused',
+					expressionDescription: 'One of: used, unused, toggle',
 				},
 			],
 			callback: async ({ options }, context) => {
-				await self.command('used', [[self.entryId(options.entry)], options.used === 'used'], context.signal)
+				const ids = self.entryIds(options.entry)
+				const used = options.used === 'toggle' ? !self.state.allUsed(ids) : options.used === 'used'
+				await self.command('used', [ids, used], context.signal)
+			},
+		},
+		mark_all_unused: {
+			name: 'Rundown: mark everything as unused',
+			sortName: 'Rundown 3',
+			description: 'Every entry of every open rundown.',
+			options: [],
+			callback: async (_, context) => {
+				await self.command('used', [self.allIds(), false], context.signal)
+			},
+		},
+		overlay: {
+			name: 'Channel: playback overlay',
+			sortName: 'Layer 5',
+			description:
+				'Shows or hides the time left on clips on a channel. It is set up in CasparCG Client, under Channels.',
+			options: [
+				server,
+				channelField(self, 'channel', 'Channel', 1),
+				{
+					id: 'overlay',
+					type: 'dropdown',
+					label: 'Overlay',
+					choices: [
+						{ id: 'show', label: 'Show' },
+						{ id: 'hide', label: 'Hide' },
+						{ id: 'toggle', label: 'Toggle' },
+					],
+					default: 'toggle',
+					expressionDescription: 'One of: show, hide, toggle',
+				},
+			],
+			callback: async ({ options }, context) => {
+				const { device, channel } = self.place(options.server, options.channel)
+				const on = options.overlay === 'toggle' ? !self.state.overlayOn(device, channel) : options.overlay === 'show'
+				try {
+					await self.command('channel', [device, channel, { overlay: { on } }], context.signal)
+				} catch (e) {
+					if (!(e instanceof Error) || e.message !== 'Unknown call channel') throw e
+					throw new Error('The playback overlay needs CasparCG Client 1.2.0 or later', { cause: e })
+				}
 			},
 		},
 		layer: {
@@ -146,7 +201,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			description: 'Controls whatever is on a layer, however it got there.',
 			options: [
 				server,
-				channelField('channel', 'Channel', 1),
+				channelField(self, 'channel', 'Channel', 1),
 				layerField('layer', 'Layer', 10),
 				{
 					id: 'command',
@@ -158,7 +213,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				},
 			],
 			callback: async ({ options }, context) => {
-				const at = { device: self.serverName(options.server), channel: options.channel, layer: options.layer }
+				const at = { ...self.place(options.server, options.channel), layer: options.layer }
 				await self.command('transport', [at, options.command], context.signal)
 			},
 		},
@@ -168,9 +223,9 @@ export function UpdateActions(self: ModuleInstance): void {
 			description: 'Swaps two layers, so what was on the first is now on the second.',
 			options: [
 				server,
-				channelField('fromChannel', 'From channel', 2),
+				channelField(self, 'fromChannel', 'From channel', 1),
 				layerField('fromLayer', 'From layer', 10),
-				channelField('toChannel', 'To channel', 1),
+				channelField(self, 'toChannel', 'To channel', 2),
 				layerField('toLayer', 'To layer', 10),
 				{
 					id: 'type',
@@ -198,9 +253,8 @@ export function UpdateActions(self: ModuleInstance): void {
 				{ id: 'hold', type: 'checkbox', label: 'Pause what comes off', default: true },
 			],
 			callback: async ({ options }, context) => {
-				const device = self.serverName(options.server)
-				const from = { device, channel: options.fromChannel, layer: options.fromLayer }
-				const to = { device, channel: options.toChannel, layer: options.toLayer }
+				const from = { ...self.place(options.server, options.fromChannel), layer: options.fromLayer }
+				const to = { ...self.place(options.server, options.toChannel), layer: options.toLayer }
 				const how = { fade: options.type === 'fade', roll: options.play, hold: options.hold, frames: options.frames }
 				await self.command('take', [from, to, how], context.signal)
 			},
@@ -208,20 +262,19 @@ export function UpdateActions(self: ModuleInstance): void {
 		clear_layer: {
 			name: 'Clear layer',
 			sortName: 'Layer 3',
-			options: [server, channelField('channel', 'Channel', 1), layerField('layer', 'Layer', 10)],
+			options: [server, channelField(self, 'channel', 'Channel', 1), layerField('layer', 'Layer', 10)],
 			callback: async ({ options }, context) => {
-				const device = self.serverName(options.server)
-				await self.clear({ device, channel: options.channel, layer: options.layer }, false, context.signal)
+				const at = { ...self.place(options.server, options.channel), layer: options.layer }
+				await self.clear(at, false, context.signal)
 			},
 		},
 		clear_channel: {
 			name: 'Clear channel',
 			sortName: 'Layer 4',
 			description: 'Everything on the channel goes off air, and its mixer settings are reset.',
-			options: [server, channelField('channel', 'Channel', 1)],
+			options: [server, channelField(self, 'channel', 'Channel', 1)],
 			callback: async ({ options }, context) => {
-				const device = self.serverName(options.server)
-				await self.clear({ device, channel: options.channel, layer: 0 }, true, context.signal)
+				await self.clear({ ...self.place(options.server, options.channel), layer: 0 }, true, context.signal)
 			},
 		},
 		amcp: {

@@ -7,6 +7,7 @@ export type VariablesSchema = {
 	rundowns: string
 	servers: number
 	servers_connected: number
+	[channelName: `channel_${number}_name`]: string
 	[layerState: `layer_${number}_${number}_state`]: string
 	[layerName: `layer_${number}_${number}_name`]: string
 	[layerLeft: `layer_${number}_${number}_left`]: string
@@ -62,12 +63,14 @@ export class Variables {
 		this.#server = server
 		for (const [key, layer] of Object.entries(state.live.layers)) {
 			const at = key.lastIndexOf('|')
-			if (key.slice(0, at) === server && layer.producer !== 'empty') this.#layers.add(key.slice(at + 1))
+			if (key.slice(0, at) === server && layer.producer !== 'empty' && !layer.overlay)
+				this.#layers.add(key.slice(at + 1))
 		}
 		const layers = [...this.#layers].map((k) => k.split('-').map(Number) as [number, number])
 		layers.sort((a, b) => a[0] - b[0] || a[1] - b[1])
 		const entries = this.#entries()
-		this.#define(layers, entries)
+		const channels = state.live.devices[0]?.channels.length ?? 0
+		this.#define(channels, layers, entries)
 
 		// Only what changed: the client reports many times a second.
 		const changed: Partial<VariablesSchema> = {}
@@ -80,6 +83,7 @@ export class Variables {
 		put('rundowns', state.rundowns.map((r) => r.name).join(', '))
 		put('servers', state.live.devices.length)
 		put('servers_connected', state.live.devices.filter((s) => s.connected).length)
+		for (let n = 1; n <= channels; n++) put(`channel_${n}_name`, state.channelName(server, n))
 		for (const [channel, layer] of layers) {
 			const info = state.layerInfo({ device: server, channel, layer })
 			put(`layer_${channel}_${layer}_state`, info.state)
@@ -100,8 +104,8 @@ export class Variables {
 		if (Object.keys(changed).length) this.#self.setVariableValues(changed)
 	}
 
-	#define(layers: [number, number][], entries: { id: string }[]): void {
-		const key = JSON.stringify([layers, entries.map((e) => e.id)])
+	#define(channels: number, layers: [number, number][], entries: { id: string }[]): void {
+		const key = JSON.stringify([channels, layers, entries.map((e) => e.id)])
 		if (key === this.#defined) return
 		this.#defined = key
 		const all: CompanionVariableDefinitions<VariablesSchema> = {
@@ -110,6 +114,7 @@ export class Variables {
 			servers: { name: 'Number of CasparCG servers' },
 			servers_connected: { name: 'Number of CasparCG servers connected' },
 		}
+		for (let n = 1; n <= channels; n++) all[`channel_${n}_name`] = { name: `Channel ${n}: name` }
 		for (const [channel, layer] of layers) {
 			const name = `Layer ${channel}-${layer}`
 			all[`layer_${channel}_${layer}_state`] = { name: `${name}: state` }
