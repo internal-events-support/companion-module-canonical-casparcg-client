@@ -1,6 +1,6 @@
 import type { CompanionVariableDefinitions } from '@companion-module/base'
 import type ModuleInstance from './main.js'
-import { refOf } from './state.js'
+import { labelOf, refOf } from './state.js'
 
 export type VariablesSchema = {
 	client_version: string
@@ -44,13 +44,14 @@ export class Variables {
 
 	/** Entries with a remote ID. Two that look alike as a variable's name get a number. */
 	#entries() {
-		const seen = new Map<string, number>()
+		const used = new Set<string>()
 		return this.#self.state.reachable().flatMap((found) => {
 			if (!found.entry.remoteId.trim()) return []
-			const id = clean(refOf(found.entry))
-			const n = (seen.get(id.toLowerCase()) ?? 0) + 1
-			seen.set(id.toLowerCase(), n)
-			return [{ id: n === 1 ? id : `${id}_${n}`, found }]
+			const base = clean(refOf(found.entry))
+			let id = base
+			for (let n = 2; used.has(id.toLowerCase()); n++) id = `${base}_${n}`
+			used.add(id.toLowerCase())
+			return [{ id, found }]
 		})
 	}
 
@@ -92,7 +93,7 @@ export class Variables {
 			put(`layer_${channel}_${layer}_clip`, info.clip)
 		}
 		for (const { id, found } of entries) {
-			put(`entry_${id}_label`, found.entry.label)
+			put(`entry_${id}_label`, labelOf(found.entry))
 			put(`entry_${id}_state`, state.entryState(found))
 			put(`entry_${id}_left`, state.entryLeft(found))
 		}

@@ -193,8 +193,10 @@ function rundowns(
 	self: ModuleInstance,
 	presets: CompanionPresetDefinitions<ModuleSchema>,
 ): CompanionPresetSection<ModuleSchema>[] {
-	if (!entryChoices(self).length) return [] // nothing to make them from
-	for (const b of ENTRY_BUTTONS) {
+	const reachable = self.state.reachable()
+	// Only buttons there is an entry for: Companion warns about presets that are not shown anywhere.
+	const buttons = ENTRY_BUTTONS.filter((b) => reachable.some((f) => b.id !== 'load' || canLoad(f.entry)))
+	for (const b of buttons) {
 		presets[`entry_${b.id}`] = {
 			type: 'simple',
 			name: b.name,
@@ -229,25 +231,26 @@ function rundowns(
 	const choices = new Map(entryChoices(self).map((c) => [c.id, c.label]))
 	const out: CompanionPresetSection<ModuleSchema>[] = []
 	for (const rundown of self.state.rundowns) {
-		const values = self.state
-			.reachable()
+		const values = reachable
 			.filter((f) => f.rundown === rundown)
 			.map(({ entry }) => ({ entry, name: choices.get(refOf(entry)), value: refOf(entry) }))
 		if (!values.length) continue
 		out.push({
 			id: `rundown_${rundown.id}`,
 			name: rundown.name,
-			definitions: ENTRY_BUTTONS.map((b): CompanionPresetGroup<ModuleSchema> => ({
-				id: `rundown_${rundown.id}_${b.id}`,
-				type: 'template',
-				name: b.name,
-				description: b.note,
-				presetId: `entry_${b.id}`,
-				templateVariableName: 'entry',
-				templateValues: values
-					.filter((v) => b.id !== 'load' || canLoad(v.entry))
-					.map(({ name, value }) => ({ name, value })),
-			})).filter((g) => g.type !== 'template' || g.templateValues.length > 0),
+			definitions: buttons
+				.map((b): CompanionPresetGroup<ModuleSchema> => ({
+					id: `rundown_${rundown.id}_${b.id}`,
+					type: 'template',
+					name: b.name,
+					description: b.note,
+					presetId: `entry_${b.id}`,
+					templateVariableName: 'entry',
+					templateValues: values
+						.filter((v) => b.id !== 'load' || canLoad(v.entry))
+						.map(({ name, value }) => ({ name, value })),
+				}))
+				.filter((g) => g.type !== 'template' || g.templateValues.length > 0),
 		})
 	}
 	return out

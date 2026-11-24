@@ -6,7 +6,7 @@ import { GetConfigFields, type ModuleConfig, type ModuleSecrets } from './config
 import { UpdateFeedbacks, type FeedbacksSchema } from './feedbacks.js'
 import { Link, type LinkState } from './link.js'
 import { UpdatePresets } from './presets.js'
-import { ClientState, ON_LAYER, type LiveState, type Place, type RundownPut } from './state.js'
+import { ClientState, ON_LAYER, type ClientSettings, type LiveState, type Place, type RundownPut } from './state.js'
 import { UpgradeScripts } from './upgrades.js'
 import { Variables, type VariablesSchema } from './variables.js'
 
@@ -27,6 +27,8 @@ const STATUS: Record<LinkState, InstanceStatus> = {
 	wrongCode: InstanceStatus.AuthenticationFailure,
 	tooOld: InstanceStatus.ConnectionFailure,
 }
+
+type ClientInit = { docs: RundownPut[]; state: LiveState; version: string; settings: ClientSettings }
 
 /** Someone typing a label should not rebuild every list for each letter. */
 const REDEFINE_AFTER = 500
@@ -85,21 +87,33 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	/**
-	 * Clear a layer, or a whole channel. Through an entry when there is one there, because then the client also
-	 * forgets what it had loaded; a bare CLEAR would leave a loaded entry to be played when it is gone.
+	 * Clear a layer, or a whole channel, and have the client forget what was there. Otherwise a loaded entry would
+	 * be played when it is gone, and a playlist would carry on when it is next edited.
 	 */
 	async clear(at: Place, whole: boolean, signal: AbortSignal): Promise<void> {
-		const found = this.state.entries().find(({ entry, parent }) => {
-			if (!ON_LAYER.includes(entry.type) || parent?.type === 'PLAYLIST') return false
-			const there = this.state.server(entry.device) === at.device && entry.channel === at.channel
-			return there && (whole || entry.layer === at.layer)
-		})
-		if (found) await this.command('execute', [found.entry.id, whole ? 'clearChannel' : 'clearLayer'], signal)
-		else if (whole) {
-			// The same as the client does, so it makes no difference which way it goes.
-			await this.command('raw', [at.device, `CLEAR ${at.channel}`], signal)
-			await this.command('raw', [at.device, `MIXER ${at.channel} CLEAR`], signal)
-		} else await this.command('raw', [at.device, `CLEAR ${at.channel}-${at.layer}`], signal)
+		const here = (p: Place) => p.device === at.device && p.channel === at.channel && (whole || p.layer === at.layer)
+		for (const { device, channel, layer } of this.state.live.decks.filter(here)) {
+			await this.command('transport', [{ device, channel, layer }, 'stop'], signal)
+		}
+		const found = this.state
+			.entries()
+			.find(({ entry, parent }) => ON_LAYER.includes(entry.type) && parent?.type !== 'PLAYLIST' && here(entry))
+		if (found) {
+			try {
+				await this.command('execute', [found.entry.id, whole ? 'clearChannel' : 'clearLayer'], signal)
+				return
+			} catch (e) {
+				// Clearing must not depend on an entry.
+				this.log('debug', `Cleared without "${found.entry.label}": ${e instanceof Error ? e.message : String(e)}`)
+			}
+		}
+		// The same as the client sends for an entry, and to the same servers.
+		const commands = whole ? [`CLEAR ${at.channel}`, `MIXER ${at.channel} CLEAR`] : [`CLEAR ${at.channel}-${at.layer}`]
+		const shadows = this.state.live.devices.filter((s) => s.connected && this.state.shadows.includes(s.name))
+		const servers = new Set([at.device, ...shadows.map((s) => s.name)])
+		for (const server of servers) {
+			for (const command of commands) await this.command('raw', [server, command], signal)
+		}
 	}
 
 	#mustBeReady(): void {
@@ -107,13 +121,13 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	#connect(config: ModuleConfig, secrets: ModuleSecrets): void {
-		const host = config.host?.trim()
+		const host = config.host?.trim().replace(/^\[(.*)\]$/, '$1')
 		const code = secrets?.code?.trim()
 		if (!host || !config.port) {
 			this.updateStatus(InstanceStatus.BadConfig, 'Enter the address and port of CasparCG Client')
 			return
 		}
-		if (/[/\s@?#]/.test(host) || (host.includes(':') && !isIPv6(host))) {
+		if (!/^[\p{L}\p{N}._-]+$/u.test(host) && (!isIPv6(host) || host.includes('%'))) {
 			this.updateStatus(InstanceStatus.BadConfig, 'Enter only the address, without http:// or a port')
 			return
 		}
@@ -125,10 +139,11 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			state: (state, message) => this.#linkState(state, message),
 			message: (name, args) => this.#message(name, args),
 			ready: async () => {
-				const all = (await link.call('init', [])) as { docs: RundownPut[]; state: LiveState; version: string }
+				const all = (await link.call('init', [])) as ClientInit
 				this.state.setRundowns(all.docs)
 				this.state.live = all.state
 				this.state.version = all.version
+				this.state.setSettings(all.settings)
 				this.#ready = true
 				this.#define()
 				this.#refresh()
@@ -172,6 +187,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 				this.state.update(news.put, news.drop)
 				break
 			}
+			case 'settings':
+				this.state.setSettings(args[0] as ClientSettings)
+				return
 			case 'toast': // what went wrong after an action had been accepted, such as an entry with a delay
 				if (args[1] === 'bad') this.log('warn', String(args[0]))
 				return
@@ -203,9 +221,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 				.map(Number)
 			return [key, state.layerInfo({ device: key.slice(0, bar), channel, layer })]
 		})
-		const entries = state
-			.entries()
-			.map(({ entry: e }) => [e.id, e.type, e.label, e.name, e.remoteId, e.device, e.channel, e.layer])
+		const entries = state.entries().map(({ entry: e, parent, rundown }) => [
+			[rundown.id, parent?.id, parent?.label, e.id, e.type],
+			[e.label, e.name, e.remoteId, e.device, e.channel, e.layer],
+		])
 		const rundowns = state.rundowns.map((r) => [r.id, r.name])
 		const shown = JSON.stringify([layers, state.live.decks, state.live.items, state.live.devices, entries, rundowns])
 		if (shown === this.#shown) return false

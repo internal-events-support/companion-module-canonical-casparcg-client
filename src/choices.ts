@@ -7,7 +7,7 @@ export function entryChoices(self: ModuleInstance): DropdownChoice<string>[] {
 	return self.state.reachable().map(({ entry, parent }) => {
 		const id = refOf(entry)
 		const label = labelOf(entry)
-		const extra = [id === label ? '' : id, parent ? `in ${parent.label}` : ''].filter(Boolean).join(', ')
+		const extra = [id === label ? '' : id, parent ? `in ${labelOf(parent)}` : ''].filter(Boolean).join(', ')
 		return { id, label: extra ? `${label} (${extra})` : label }
 	})
 }

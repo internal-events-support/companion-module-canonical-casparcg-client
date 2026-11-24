@@ -37,7 +37,7 @@ Every entry can be used, whether or not "Allow remote" is on for it in the clien
 | Layer: play, pause, skip …      | Controls whatever is on a layer                                                                                                                                                                    |
 | Take between channels           | Swaps two layers, as a cut or a fade over a number of frames. Can play the clip as it is taken, and pauses the one that comes off unless that is turned off. A take from an empty layer is refused |
 | Clear layer                     | Takes what is on a layer off air                                                                                                                                                                   |
-| Clear channel                   | Takes everything on a channel off air, and resets its mixer settings                                                                                                                               |
+| Clear channel                   | Takes everything on a channel off air, and resets its mixer settings. Both clears also stop a playlist that is there                                                                               |
 | Send a CasparCG command         | Sends any AMCP command to a server. The reply is the action's result                                                                                                                               |
 
 How far _Back_ and _Forward_ skip is set in the client, under Settings > Playback.
@@ -63,22 +63,22 @@ When the connection to the client is lost, nothing is shown as playing or loaded
 
 ## Variables
 
-| Variable                                            | What it holds                                                       |
-| --------------------------------------------------- | ------------------------------------------------------------------- |
-| `client_version`                                    | Version of the client                                               |
-| `rundowns`                                          | Names of the open rundowns                                          |
-| `servers`, `servers_connected`                      | Number of CasparCG servers, and how many are connected              |
-| `layer_1_10_state`                                  | `playing`, `paused`, `loaded`, `ended` or `empty`                   |
-| `layer_1_10_name`, `layer_1_10_next`                | Clip name, and the clip after it                                    |
-| `layer_1_10_left`                                   | Time left, for example `01:25`                                      |
-| `layer_1_10_seconds`                                | Time left in seconds, as a number                                   |
-| `layer_1_10_elapsed`, `layer_1_10_duration`         | Time played, and length                                             |
-| `layer_1_10_playlist`, `layer_1_10_clip`            | Playlist on the layer, and the clip number in it, for example `2/5` |
-| `entry_ID_label`, `entry_ID_state`, `entry_ID_left` | For every entry with a remote ID, with that in place of `ID`        |
+| Variable                                            | What it holds                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------- |
+| `client_version`                                    | Version of the client                                                   |
+| `rundowns`                                          | Names of the open rundowns                                              |
+| `servers`, `servers_connected`                      | Number of CasparCG servers, and how many are connected                  |
+| `layer_1_10_state`                                  | `playing`, `paused`, `loaded`, `ended` or `empty`                       |
+| `layer_1_10_name`, `layer_1_10_next`                | Clip name, and the clip after it                                        |
+| `layer_1_10_left`                                   | Time left, for example `01:25`                                          |
+| `layer_1_10_seconds`                                | Time left in seconds, as a number. Empty for something without a length |
+| `layer_1_10_elapsed`, `layer_1_10_duration`         | Time played, and length                                                 |
+| `layer_1_10_playlist`, `layer_1_10_clip`            | Playlist on the layer, and the clip number in it, for example `2/5`     |
+| `entry_ID_label`, `entry_ID_state`, `entry_ID_left` | For every entry with a remote ID, with that in place of `ID`            |
 
 Layer variables are for the first server in the client's settings, and appear once something has been on the layer. For other servers use the _Layer: clip name, time left …_ feedback.
 
-In the name of an entry's variables, anything in the remote ID but letters, numbers, `-` and `_` becomes `_`. If that makes two the same, the second gets `_2`.
+In the name of an entry's variables, anything in the remote ID but letters, numbers, `-` and `_` becomes `_`. If that makes two the same, the second gets `_2`, the third `_3`, and so on.
 
 ## Presets
 

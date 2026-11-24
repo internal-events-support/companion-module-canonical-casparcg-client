@@ -42,6 +42,8 @@ export type LiveState = {
 	items: Record<string, { state: string; used: boolean }>
 }
 
+export type ClientSettings = { devices?: { name: string; shadow: boolean }[] }
+
 export type PlayState = 'playing' | 'paused' | 'loaded' | 'ended' | 'empty'
 export type Place = { device: string; channel: number; layer: number }
 export type Found = { entry: Entry; parent: Entry | null; rundown: Rundown }
@@ -72,6 +74,7 @@ const PRODUCERS: Record<string, string> = {
 	image: 'Image',
 	ndi: 'NDI source',
 	route: 'Route',
+	transition: 'Transition',
 }
 
 export const canLoad = (e: Entry): boolean => LOADABLE.includes(e.type)
@@ -116,6 +119,8 @@ export class ClientState {
 	rundowns: Rundown[] = []
 	live: LiveState = EMPTY
 	version = ''
+	/** Servers that repeat what rundown entries send. */
+	shadows: string[] = []
 	#entries: Found[] | null = null
 	#names = new Map<string, Found>()
 
@@ -123,12 +128,17 @@ export class ClientState {
 		this.rundowns = []
 		this.live = EMPTY
 		this.version = ''
+		this.shadows = []
 		this.#entries = null
 	}
 
 	/** The connection is gone: nothing is known about what is playing. */
 	lost(): void {
 		this.live = { ...EMPTY, devices: this.live.devices.map((server) => ({ ...server, connected: false })) }
+	}
+
+	setSettings(settings: ClientSettings): void {
+		this.shadows = (settings.devices ?? []).filter((d) => d.shadow).map((d) => d.name)
 	}
 
 	setRundowns(all: RundownPut[]): void {
