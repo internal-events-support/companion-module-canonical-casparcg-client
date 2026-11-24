@@ -10,6 +10,7 @@ export type VariablesSchema = {
 	[layerState: `layer_${number}_${number}_state`]: string
 	[layerName: `layer_${number}_${number}_name`]: string
 	[layerLeft: `layer_${number}_${number}_left`]: string
+	[layerSeconds: `layer_${number}_${number}_seconds`]: number | null
 	[layerElapsed: `layer_${number}_${number}_elapsed`]: string
 	[layerDuration: `layer_${number}_${number}_duration`]: string
 	[layerNext: `layer_${number}_${number}_next`]: string
@@ -27,6 +28,7 @@ export class Variables {
 	readonly #self: ModuleInstance
 	/** Layers of the first server that have had something on them since connecting. */
 	readonly #layers = new Set<string>()
+	#server = ''
 	#defined = ''
 	#sent = new Map<string, unknown>()
 
@@ -40,20 +42,23 @@ export class Variables {
 		this.#sent.clear()
 	}
 
-	/** Entries with a remote ID, first of each. */
+	/** Entries with a remote ID. Two that look alike as a variable's name get a number. */
 	#entries() {
-		const seen = new Set<string>()
-		return this.#self.state.entries().flatMap((found) => {
+		const seen = new Map<string, number>()
+		return this.#self.state.reachable().flatMap((found) => {
+			if (!found.entry.remoteId.trim()) return []
 			const id = clean(refOf(found.entry))
-			if (!found.entry.remoteId.trim() || seen.has(id)) return []
-			seen.add(id)
-			return [{ id, found }]
+			const n = (seen.get(id.toLowerCase()) ?? 0) + 1
+			seen.set(id.toLowerCase(), n)
+			return [{ id: n === 1 ? id : `${id}_${n}`, found }]
 		})
 	}
 
 	update(): void {
 		const { state } = this.#self
 		const server = state.server()
+		if (server !== this.#server) this.#layers.clear()
+		this.#server = server
 		for (const [key, layer] of Object.entries(state.live.layers)) {
 			const at = key.lastIndexOf('|')
 			if (key.slice(0, at) === server && layer.producer !== 'empty') this.#layers.add(key.slice(at + 1))
@@ -79,6 +84,7 @@ export class Variables {
 			put(`layer_${channel}_${layer}_state`, info.state)
 			put(`layer_${channel}_${layer}_name`, info.name)
 			put(`layer_${channel}_${layer}_left`, info.left)
+			put(`layer_${channel}_${layer}_seconds`, info.seconds)
 			put(`layer_${channel}_${layer}_elapsed`, info.elapsed)
 			put(`layer_${channel}_${layer}_duration`, info.duration)
 			put(`layer_${channel}_${layer}_next`, info.next)
@@ -108,6 +114,7 @@ export class Variables {
 			all[`layer_${channel}_${layer}_state`] = { name: `${name}: state` }
 			all[`layer_${channel}_${layer}_name`] = { name: `${name}: clip name` }
 			all[`layer_${channel}_${layer}_left`] = { name: `${name}: time left` }
+			all[`layer_${channel}_${layer}_seconds`] = { name: `${name}: time left in seconds` }
 			all[`layer_${channel}_${layer}_elapsed`] = { name: `${name}: time played` }
 			all[`layer_${channel}_${layer}_duration`] = { name: `${name}: length` }
 			all[`layer_${channel}_${layer}_next`] = { name: `${name}: next clip` }

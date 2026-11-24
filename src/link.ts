@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { isIPv6 } from 'node:net'
 
 /** Why the link is not up, so the module can show the right status. */
 export type LinkState = 'connecting' | 'ok' | 'failed' | 'wrongCode' | 'tooOld'
@@ -42,7 +43,7 @@ export class Link {
 
 	constructor(host: string, port: number, code: string, on: LinkHandlers) {
 		// An IPv6 address needs brackets in a URL.
-		this.#base = `http://${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}:${port}`
+		this.#base = `http://${isIPv6(host) ? `[${host}]` : host}:${port}`
 		this.#code = code
 		this.#on = on
 	}
@@ -126,7 +127,7 @@ export class Link {
 		this.#cookie = cookie
 		// The web interface of version 1.0 has no such page.
 		const me = await fetch(`${this.#base}/me`, { headers: { Cookie: cookie }, signal })
-		if (!me.ok) throw new LinkError('tooOld', 'CasparCG Client 1.1.0 or later is needed', 30000)
+		if (!me.ok) throw new LinkError('tooOld', "Canonical's CasparCG Client 1.1.0 or later is needed", 30000)
 		await me.body?.cancel()
 	}
 
@@ -181,5 +182,6 @@ function reason(e: unknown): string {
 	const code = (cause as { code?: unknown }).code
 	if (code === 'ECONNREFUSED') return 'Nothing is listening there. Is the web interface on?'
 	if (code === 'ENOTFOUND') return 'That address was not found'
-	return cause instanceof Error ? cause.message : String(cause)
+	const text = cause instanceof Error ? cause.message : String(cause)
+	return text || (typeof code === 'string' ? code : 'The connection failed')
 }

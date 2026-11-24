@@ -48,9 +48,37 @@ export type Found = { entry: Entry; parent: Entry | null; rundown: Rundown }
 
 const EMPTY: LiveState = { devices: [], layers: {}, decks: [], items: {} }
 const TIMED = ['MOVIE', 'AUDIO', 'PLAYLIST']
+/** Entries that put one thing on one layer. */
+export const ON_LAYER = [
+	'MOVIE',
+	'AUDIO',
+	'STILL',
+	'TEMPLATE',
+	'HTML',
+	'SOLIDCOLOR',
+	'IMAGESCROLLER',
+	'ROUTECHANNEL',
+	'ROUTEVIDEOLAYER',
+	'DECKLINKINPUT',
+]
+const LOADABLE = [...ON_LAYER, 'PLAYLIST', 'GROUP']
+/** A Playout Command presses a button on the screen that plays it, so it does nothing from here. */
+const LEFT_OUT = ['SEPARATOR', 'PLAYOUTCOMMAND']
+/** What is on a layer when it is not a file. */
+const PRODUCERS: Record<string, string> = {
+	color: 'Colour',
+	decklink: 'DeckLink input',
+	html: 'HTML page',
+	image: 'Image',
+	ndi: 'NDI source',
+	route: 'Route',
+}
+
+export const canLoad = (e: Entry): boolean => LOADABLE.includes(e.type)
+export const labelOf = (e: Entry): string => e.label.trim() || e.name.trim()
 
 /** What a user calls an entry: its remote ID when it has one, otherwise its label. */
-export const refOf = (e: Entry): string => e.remoteId.trim() || e.label.trim() || e.name.trim()
+export const refOf = (e: Entry): string => e.remoteId.trim() || labelOf(e)
 export const short = (name: string): string => name.replace(/\\/g, '/').split('/').pop() ?? ''
 
 /** Minutes and seconds, or hours when there are any. Rounded up, like a countdown. */
@@ -73,8 +101,10 @@ export type LayerInfo = {
 	state: PlayState
 	name: string
 	left: string
-	/** Seconds left, or null when nothing is counting down. */
+	/** Whole seconds left, or null for something without a length. */
 	seconds: number | null
+	/** Counting down to its end: playing, and not looping. */
+	counting: boolean
 	elapsed: string
 	duration: string
 	next: string
@@ -86,19 +116,29 @@ export class ClientState {
 	rundowns: Rundown[] = []
 	live: LiveState = EMPTY
 	version = ''
+	#entries: Found[] | null = null
+	#names = new Map<string, Found>()
 
 	reset(): void {
 		this.rundowns = []
 		this.live = EMPTY
 		this.version = ''
+		this.#entries = null
+	}
+
+	/** The connection is gone: nothing is known about what is playing. */
+	lost(): void {
+		this.live = { ...EMPTY, devices: this.live.devices.map((server) => ({ ...server, connected: false })) }
 	}
 
 	setRundowns(all: RundownPut[]): void {
 		this.rundowns = all.map((x) => x.doc)
+		this.#entries = null
 	}
 
 	/** Another screen changed, opened or closed rundowns. */
 	update(put: RundownPut[], drop: string[]): void {
+		this.#entries = null
 		this.rundowns = this.rundowns.filter((r) => !drop.includes(r.id))
 		for (const { doc } of put) {
 			const at = this.rundowns.findIndex((r) => r.id === doc.id)
@@ -114,27 +154,38 @@ export class ClientState {
 
 	/** Every entry that does something, in rundown order. */
 	entries(): Found[] {
+		if (this.#entries) return this.#entries
 		const out: Found[] = []
 		for (const rundown of this.rundowns) {
 			for (const entry of rundown.items) {
-				if (entry.type !== 'SEPARATOR') out.push({ entry, parent: null, rundown })
+				if (!LEFT_OUT.includes(entry.type)) out.push({ entry, parent: null, rundown })
 				for (const child of entry.items ?? []) {
-					if (child.type !== 'SEPARATOR') out.push({ entry: child, parent: entry, rundown })
+					if (!LEFT_OUT.includes(child.type)) out.push({ entry: child, parent: entry, rundown })
 				}
 			}
 		}
+		// Remote IDs first, then labels of entries without one, then labels of the rest. The first of each wins.
+		this.#names = new Map()
+		const add = (name: string, found: Found) => {
+			const key = name.trim().toLowerCase()
+			if (key && !this.#names.has(key)) this.#names.set(key, found)
+		}
+		for (const f of out) add(f.entry.remoteId, f)
+		for (const f of out) if (!f.entry.remoteId.trim()) add(labelOf(f.entry), f)
+		for (const f of out) add(labelOf(f.entry), f)
+		this.#entries = out
 		return out
 	}
 
-	/** By remote ID, or else by label. The first in rundown order wins. */
+	/** By remote ID, or else by label. */
 	find(ref: string): Found | undefined {
-		const want = ref.trim().toLowerCase()
-		if (!want) return undefined
-		const all = this.entries()
-		return (
-			all.find((f) => f.entry.remoteId.trim().toLowerCase() === want) ??
-			all.find((f) => (f.entry.label.trim() || f.entry.name.trim()).toLowerCase() === want)
-		)
+		this.entries()
+		return this.#names.get(String(ref).trim().toLowerCase())
+	}
+
+	/** Entries that are reached by the name they are offered under. */
+	reachable(): Found[] {
+		return this.entries().filter((f) => this.find(refOf(f.entry))?.entry === f.entry)
 	}
 
 	deckAt(p: Place): Deck | undefined {
@@ -150,14 +201,17 @@ export class ClientState {
 		const deck = this.deckAt(p)
 		const state = layerState(l)
 		const timed = !!l?.end
-		const left = timed ? Math.max(0, l.end - l.pos) : 0
+		// Whole seconds, so that played and left always add up to the length.
+		const left = timed ? Math.max(0, Math.ceil(l.end - l.pos - 0.05)) : 0
+		const length = timed ? Math.max(left, Math.ceil(l.end - l.start - 0.05)) : 0
 		return {
 			state,
-			name: l && l.producer !== 'empty' ? short(l.name) || l.producer : '',
+			name: l && l.producer !== 'empty' ? short(l.name) || PRODUCERS[l.producer] || l.producer : '',
 			left: timed ? clock(left) : '',
-			seconds: timed && state === 'playing' && !l.loop ? left : null,
-			elapsed: timed ? clock(l.end - l.start - left) : '',
-			duration: timed ? clock(l.end - l.start) : '',
+			seconds: timed ? left : null,
+			counting: timed && state === 'playing' && !l.loop,
+			elapsed: timed ? clock(length - left) : '',
+			duration: timed ? clock(length) : '',
 			next: l?.next ? short(l.next) : '',
 			playlist: deck?.label ?? '',
 			clip: deck ? `${deck.index + 1}/${deck.count}` : '',
@@ -174,11 +228,18 @@ export class ClientState {
 	}
 
 	entryState(f: Found): PlayState {
+		if (f.entry.type === 'GROUP') return this.#groupState(f)
 		const s = this.live.items[f.entry.id]?.state
 		if (s !== 'playing' && s !== 'paused' && s !== 'loaded') return 'empty'
-		if (s === 'playing' && TIMED.includes(f.entry.type) && layerState(this.layer(this.place(f))) === 'ended')
-			return 'ended'
-		return s
+		const ended = TIMED.includes(f.entry.type) && layerState(this.layer(this.place(f))) === 'ended'
+		return s !== 'loaded' && ended ? 'ended' : s
+	}
+
+	/** The liveliest state of what is in it. */
+	#groupState({ entry, rundown }: Found): PlayState {
+		const inside = (entry.items ?? []).map((child) => this.entryState({ entry: child, parent: entry, rundown }))
+		const order: PlayState[] = ['playing', 'paused', 'loaded', 'ended']
+		return order.find((s) => inside.includes(s)) ?? 'empty'
 	}
 
 	entryUsed(f: Found): boolean {

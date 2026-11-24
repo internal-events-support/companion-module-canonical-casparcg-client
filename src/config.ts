@@ -14,10 +14,10 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 		{
 			type: 'static-text',
 			id: 'info',
-			label: 'CasparCG Client',
+			label: 'Information',
 			width: 12,
 			value:
-				'Needs CasparCG Client 1.1.0 or later. The port and access code are in its Settings, under Web Interface. If Companion runs on another computer, turn on "Allow other devices" there too.',
+				"Needs Canonical's CasparCG Client 1.1.0 or later, which is not the original CasparCG Client (2.x). The port and access code are in its Settings, under Web Interface. If Companion runs on another computer, turn on 'Allow other devices' there too.",
 		},
 		{
 			type: 'textinput',

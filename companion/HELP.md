@@ -1,80 +1,110 @@
-# CasparCG Client
+# Canonical: CasparCG Client
 
-Controls CasparCG Client: rundown entries, playlists, takes between channels, and any layer.
+Controls Canonical's CasparCG Client: rundown entries, playlists, takes between channels, and any layer.
+
+This is **not** for the original CasparCG Client (version 2.x), and not for a CasparCG server directly.
 
 ## Setup
 
-This module needs **CasparCG Client 1.1.0 or later** and Companion 5.0 or later.
+This module needs **Canonical's CasparCG Client 1.1.0 or later** and Companion 5.0 or later. The client comes from Canonical's internal events team.
 
-1. In CasparCG Client open **Settings > Web Interface** and turn the web interface on.
+1. In the client open **Settings > Web Interface** and turn the web interface on.
 2. If Companion runs on another computer, also turn on **Allow other devices**.
 3. Enter these in the module's settings:
 
-| Setting     | What to enter                                                                          |
-| ----------- | -------------------------------------------------------------------------------------- |
-| Address     | The computer running CasparCG Client. `127.0.0.1` when it is the same one as Companion |
-| Port        | The port in Settings > Web Interface, usually `8126`                                   |
-| Access code | The access code in Settings > Web Interface                                            |
+| Setting     | What to enter                                                                                        |
+| ----------- | ---------------------------------------------------------------------------------------------------- |
+| Address     | The computer running the client, without `http://`. `127.0.0.1` when it is the same one as Companion |
+| Port        | The port in Settings > Web Interface, usually `8126`                                                 |
+| Access code | The access code in Settings > Web Interface                                                          |
 
 The connection is not encrypted, so use it on a network you trust.
 
 ## Rundown entries
 
-Entries are found by their **remote ID**, or else by their **label**, in any rundown that is open in the client. If two entries have the same label, the first one is used. Give entries a remote ID to be sure of reaching the right one, and to be free to change the label later.
+You can pick an entry from the list, or type its remote ID or label. The list follows the rundowns that are open in the client.
 
-You can pick an entry from the list or type its remote ID or label. The list follows the open rundowns.
+An entry is looked for by its **remote ID** first, and then by its **label**. If several have the same label, one without a remote ID goes first, and otherwise the first in the rundown. Only entries that can be reached this way are in the list. Give entries a remote ID to be sure of the right one, and to be free to change the label later.
+
+Every entry can be used, whether or not "Allow remote" is on for it in the client. Playout Command entries are left out: they press a button on the screen that plays them, so they would do nothing from Companion.
 
 ## Actions
 
-| Action                          | What it does                                                                                     |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Rundown: play, load, stop …     | Does to an entry what its buttons in the client do. Also for playlists, groups and takes         |
-| Rundown: mark as used or unused | Sets the used mark on an entry                                                                   |
-| Layer: play, pause, skip …      | Controls whatever is on a layer                                                                  |
-| Take between channels           | Swaps two layers, as a cut or a fade, and can play the clip as it is taken                       |
-| Clear layer, Clear channel      | Takes what is there off air                                                                      |
-| Send a CasparCG command         | Sends any AMCP command to a server. The reply can be stored in a variable as the action's result |
+| Action                          | What it does                                                                                                                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rundown: play, load, stop …     | Does to an entry what its buttons in the client do. Also for playlists, groups and takes                                                                                                           |
+| Rundown: mark as used or unused | Sets or removes the used mark on an entry                                                                                                                                                          |
+| Layer: play, pause, skip …      | Controls whatever is on a layer                                                                                                                                                                    |
+| Take between channels           | Swaps two layers, as a cut or a fade over a number of frames. Can play the clip as it is taken, and pauses the one that comes off unless that is turned off. A take from an empty layer is refused |
+| Clear layer                     | Takes what is on a layer off air                                                                                                                                                                   |
+| Clear channel                   | Takes everything on a channel off air, and resets its mixer settings                                                                                                                               |
+| Send a CasparCG command         | Sends any AMCP command to a server. The reply is the action's result                                                                                                                               |
 
 How far _Back_ and _Forward_ skip is set in the client, under Settings > Playback.
 
+Where an action or feedback asks for a **CasparCG server**, leave it at _First server_ to use the first one in the client's settings.
+
 ## Feedbacks
 
-| Feedback                             | Type    | What it shows                                                   |
-| ------------------------------------ | ------- | --------------------------------------------------------------- |
-| Rundown: entry is playing, loaded …  | Boolean | The state of an entry                                           |
-| Rundown: entry is marked as used     | Boolean | The used mark                                                   |
-| Rundown: time left on an entry       | Value   | For example `01:25`, or empty when it is not loaded or playing  |
-| Layer: is playing, paused, empty …   | Boolean | The state of a layer                                            |
-| Layer: a certain clip is on it       | Boolean | Whether a clip is on a layer, whatever put it there             |
-| Layer: less than a certain time left | Boolean | For warning colours. Only while a clip plays that does not loop |
-| Layer: clip name, time left …        | Value   | Clip name, state, times, next clip or playlist of a layer       |
-| CasparCG server is connected         | Boolean | Whether the client is connected to its CasparCG server          |
+| Feedback                             | Type    | What it shows                                                                                          |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------ |
+| Rundown: entry is playing, loaded …  | Boolean | The state of an entry. A group shows the state of what is in it                                        |
+| Rundown: entry is marked as used     | Boolean | The used mark                                                                                          |
+| Rundown: time left on an entry       | Value   | For example `01:25`. For videos, audio and playlists that are on a layer, otherwise empty              |
+| Layer: is playing, paused, empty …   | Boolean | The state of a layer. Only videos and audio can be loaded or ended; anything else is playing or paused |
+| Layer: a certain clip is on it       | Boolean | Whether a video or audio clip is on a layer, whatever put it there                                     |
+| Layer: less than a certain time left | Boolean | For warning colours. Only while a clip plays that does not loop                                        |
+| Layer: clip name, time left …        | Value   | Clip name, state, times, time left in seconds, next clip, playlist, or clip number in the playlist     |
+| CasparCG server is connected         | Boolean | Whether the client is connected to its CasparCG server                                                 |
+
+Takes, mixer entries and commands happen at once, so they are never shown as playing.
+
+When the connection to the client is lost, nothing is shown as playing or loaded until it is back.
 
 ## Variables
 
-| Variable                                   | What it holds                                                |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| `client_version`                           | Version of CasparCG Client                                   |
-| `rundowns`                                 | Names of the open rundowns                                   |
-| `servers`, `servers_connected`             | Number of CasparCG servers, and how many are connected       |
-| `layer_1_10_state`                         | `playing`, `paused`, `loaded`, `ended` or `empty`            |
-| `layer_1_10_name`, `_next`                 | Clip name and the clip after it                              |
-| `layer_1_10_left`, `_elapsed`, `_duration` | Times, for example `01:25`                                   |
-| `layer_1_10_playlist`, `_clip`             | Playlist on the layer and its place in it, for example `2/5` |
-| `entry_ID_label`, `_state`, `_left`        | For every entry with a remote ID                             |
+| Variable                                            | What it holds                                                       |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| `client_version`                                    | Version of the client                                               |
+| `rundowns`                                          | Names of the open rundowns                                          |
+| `servers`, `servers_connected`                      | Number of CasparCG servers, and how many are connected              |
+| `layer_1_10_state`                                  | `playing`, `paused`, `loaded`, `ended` or `empty`                   |
+| `layer_1_10_name`, `layer_1_10_next`                | Clip name, and the clip after it                                    |
+| `layer_1_10_left`                                   | Time left, for example `01:25`                                      |
+| `layer_1_10_seconds`                                | Time left in seconds, as a number                                   |
+| `layer_1_10_elapsed`, `layer_1_10_duration`         | Time played, and length                                             |
+| `layer_1_10_playlist`, `layer_1_10_clip`            | Playlist on the layer, and the clip number in it, for example `2/5` |
+| `entry_ID_label`, `entry_ID_state`, `entry_ID_left` | For every entry with a remote ID, with that in place of `ID`        |
 
-Layer variables are for the first server in the client's settings, and appear once something has been on the layer. In a remote ID, anything but letters, numbers, `-` and `_` becomes `_` in the variable's name. For other servers use the _Layer: clip name, time left …_ feedback.
+Layer variables are for the first server in the client's settings, and appear once something has been on the layer. For other servers use the _Layer: clip name, time left …_ feedback.
+
+In the name of an entry's variables, anything in the remote ID but letters, numbers, `-` and `_` becomes `_`. If that makes two the same, the second gets `_2`.
 
 ## Presets
 
-There are presets for takes from channel 2 to channel 1, for layer 10 of every channel, and for playing, loading and stopping every entry of the open rundowns.
+- **Takes:** cut or fade from channel 2 to channel 1. The channels and layer are local variables of the button.
+- **Channels:** clip and time left, and the transport buttons, for layer 10 of every channel of the first server. The channel and layer are local variables of the button.
+- **Each open rundown:** Play and Stop for every entry in the list, and Load for those that can be loaded.
 
 ## Troubleshooting
 
-| Status                                   | What to do                                                                            |
-| ---------------------------------------- | ------------------------------------------------------------------------------------- |
-| Wrong access code                        | Enter the code from Settings > Web Interface. Changing it there signs this module out |
-| Nothing is listening there               | Start the client, turn on its web interface, and check the port                       |
-| CasparCG Client 1.1.0 or later is needed | Update the client                                                                     |
-| Cannot connect from another computer     | Turn on Allow other devices in the client, and let it through the firewall            |
-| No open rundown has an entry called …    | Open the rundown in the client, or check the remote ID or label on the button         |
+These are shown as the status of the connection:
+
+| Status                                                          | What to do                                                                                               |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Enter the address and port of CasparCG Client                   | Fill in the settings                                                                                     |
+| Enter only the address, without http:// or a port               | Put the port in its own setting                                                                          |
+| Enter the access code                                           | Fill in the access code                                                                                  |
+| Wrong access code                                               | Enter the code from Settings > Web Interface. The module does not try again until the settings are saved |
+| Too many wrong access codes. Trying again soon                  | Wait a minute                                                                                            |
+| Nothing is listening there. Is the web interface on?            | Start the client, turn on its web interface, and check the port                                          |
+| That address was not found                                      | Check the address                                                                                        |
+| This does not answer like CasparCG Client                       | Something else is using that port. Check the address and port                                            |
+| Canonical's CasparCG Client 1.1.0 or later is needed            | Update the client                                                                                        |
+| CasparCG Client stopped answering, or The connection was closed | The client was closed or the network dropped. The module keeps trying                                    |
+
+Other things:
+
+- **It cannot connect from another computer:** turn on Allow other devices in the client, and let it through that computer's firewall.
+- **The log says no open rundown has an entry called …:** open the rundown in the client, or check the remote ID or label on the button.
+- **The log says it is not connected:** the action was pressed while the connection was down, so nothing was sent.

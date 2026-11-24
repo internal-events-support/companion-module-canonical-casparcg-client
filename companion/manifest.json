@@ -4,7 +4,7 @@
 	"id": "canonical-casparcg-client",
 	"name": "Canonical: CasparCG Client",
 	"shortname": "CasparCG Client",
-	"description": "Runs rundowns, playlists and takes in CasparCG Client",
+	"description": "Runs rundowns, playlists and takes in Canonical's CasparCG Client (not the original CasparCG Client)",
 	"version": "0.0.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-canonical-casparcg-client.git",
@@ -12,7 +12,7 @@
 	"maintainers": [
 		{
 			"name": "internal-events-support",
-			"email": ""
+			"github": "internal-events-support"
 		}
 	],
 	"runtime": {

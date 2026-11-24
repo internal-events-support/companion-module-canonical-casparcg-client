@@ -1,5 +1,5 @@
-import type { CompanionInputFieldNumber, CompanionInputFieldTextInput, DropdownChoice } from '@companion-module/base'
-import { entryChoices, serverChoices } from './choices.js'
+import type { CompanionInputFieldTextInput, DropdownChoice } from '@companion-module/base'
+import { channelField, entryField, layerField, listIds, serverField } from './choices.js'
 import type ModuleInstance from './main.js'
 
 export type ActionsSchema = {
@@ -85,38 +85,9 @@ const LAYER_COMMANDS: DropdownChoice<string>[] = [
 	{ id: 'prev', label: 'Previous clip in the playlist' },
 ]
 
-const list = (choices: DropdownChoice<string>[]) => `One of: ${choices.map((c) => c.id).join(', ')}`
-
-function channel<K extends string>(id: K, label: string, value: number): CompanionInputFieldNumber<K> {
-	return { id, type: 'number', label, default: value, min: 1, max: 99, asInteger: true }
-}
-
-function layer<K extends string>(id: K, label: string, value: number): CompanionInputFieldNumber<K> {
-	return { id, type: 'number', label, default: value, min: 0, max: 9999, asInteger: true }
-}
-
 export function UpdateActions(self: ModuleInstance): void {
-	const entries = entryChoices(self)
-	const servers = serverChoices(self)
-	const entry = {
-		id: 'entry',
-		type: 'dropdown',
-		label: 'Rundown entry',
-		description: 'Choose one, or type a remote ID or label',
-		choices: entries,
-		default: entries[0]?.id ?? '',
-		allowCustom: true,
-		expressionDescription: 'The remote ID or label of an entry in an open rundown',
-	} as const
-	const server = {
-		id: 'server',
-		type: 'dropdown',
-		label: 'CasparCG server',
-		choices: servers,
-		default: '',
-		allowCustom: true,
-		expressionDescription: 'The name of a server in CasparCG Client. Empty = the first one',
-	} as const
+	const entry = entryField(self)
+	const server = serverField(self)
 	const amcp: CompanionInputFieldTextInput<'command'> = {
 		id: 'command',
 		type: 'textinput',
@@ -141,7 +112,7 @@ export function UpdateActions(self: ModuleInstance): void {
 					label: 'Command',
 					choices: ENTRY_COMMANDS,
 					default: 'play',
-					expressionDescription: list(ENTRY_COMMANDS),
+					expressionDescription: listIds(ENTRY_COMMANDS),
 				},
 			],
 			callback: async ({ options }, context) => {
@@ -175,15 +146,15 @@ export function UpdateActions(self: ModuleInstance): void {
 			description: 'Controls whatever is on a layer, however it got there.',
 			options: [
 				server,
-				channel('channel', 'Channel', 1),
-				layer('layer', 'Layer', 10),
+				channelField('channel', 'Channel', 1),
+				layerField('layer', 'Layer', 10),
 				{
 					id: 'command',
 					type: 'dropdown',
 					label: 'Command',
 					choices: LAYER_COMMANDS,
 					default: 'toggle',
-					expressionDescription: list(LAYER_COMMANDS),
+					expressionDescription: listIds(LAYER_COMMANDS),
 				},
 			],
 			callback: async ({ options }, context) => {
@@ -197,10 +168,10 @@ export function UpdateActions(self: ModuleInstance): void {
 			description: 'Swaps two layers, so what was on the first is now on the second.',
 			options: [
 				server,
-				channel('fromChannel', 'From channel', 2),
-				layer('fromLayer', 'From layer', 10),
-				channel('toChannel', 'To channel', 1),
-				layer('toLayer', 'To layer', 10),
+				channelField('fromChannel', 'From channel', 2),
+				layerField('fromLayer', 'From layer', 10),
+				channelField('toChannel', 'To channel', 1),
+				layerField('toLayer', 'To layer', 10),
 				{
 					id: 'type',
 					type: 'dropdown',
@@ -237,19 +208,20 @@ export function UpdateActions(self: ModuleInstance): void {
 		clear_layer: {
 			name: 'Clear layer',
 			sortName: 'Layer 3',
-			options: [server, channel('channel', 'Channel', 1), layer('layer', 'Layer', 10)],
+			options: [server, channelField('channel', 'Channel', 1), layerField('layer', 'Layer', 10)],
 			callback: async ({ options }, context) => {
-				const command = `CLEAR ${options.channel}-${options.layer}`
-				await self.command('raw', [self.serverName(options.server), command], context.signal)
+				const device = self.serverName(options.server)
+				await self.clear({ device, channel: options.channel, layer: options.layer }, false, context.signal)
 			},
 		},
 		clear_channel: {
 			name: 'Clear channel',
 			sortName: 'Layer 4',
-			description: 'Everything on the channel goes off air.',
-			options: [server, channel('channel', 'Channel', 1)],
+			description: 'Everything on the channel goes off air, and its mixer settings are reset.',
+			options: [server, channelField('channel', 'Channel', 1)],
 			callback: async ({ options }, context) => {
-				await self.command('raw', [self.serverName(options.server), `CLEAR ${options.channel}`], context.signal)
+				const device = self.serverName(options.server)
+				await self.clear({ device, channel: options.channel, layer: 0 }, true, context.signal)
 			},
 		},
 		amcp: {

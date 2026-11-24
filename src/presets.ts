@@ -8,7 +8,7 @@ import {
 import { entryChoices } from './choices.js'
 import type { ModuleSchema } from './main.js'
 import type ModuleInstance from './main.js'
-import { refOf } from './state.js'
+import { canLoad, refOf } from './state.js'
 
 type Preset = CompanionSimplePresetDefinition<ModuleSchema>
 
@@ -21,6 +21,8 @@ const RED = combineRgb(190, 0, 0)
 
 const CHANNEL = { isExpression: true, value: '$(local:channel)' } as const
 const LAYER = { isExpression: true, value: '$(local:layer)' } as const
+const FROM = { isExpression: true, value: '$(local:from)' } as const
+const TO = { isExpression: true, value: '$(local:to)' } as const
 const ENTRY = { isExpression: true, value: '$(local:entry)' } as const
 
 /** The layer the client uses for clips unless told otherwise. */
@@ -50,8 +52,12 @@ const LAYER_BUTTONS = [
 ] as const
 
 const ENTRY_BUTTONS = [
-	{ id: 'play', name: 'Play', note: 'Green while it is playing' },
-	{ id: 'load', name: 'Load', note: 'Amber while it is loaded' },
+	{
+		id: 'play',
+		name: 'Play',
+		note: 'Green while it is playing. Takes, mixer entries and commands happen at once, so they never turn green',
+	},
+	{ id: 'load', name: 'Load', note: 'Amber while it is loaded. Only for entries that can be loaded' },
 	{ id: 'stop', name: 'Stop', note: '' },
 ] as const
 
@@ -60,7 +66,12 @@ function takes(presets: CompanionPresetDefinitions<ModuleSchema>): CompanionPres
 		presets[`take_${t.id}`] = {
 			type: 'simple',
 			name: `${t.name}, channel 2 to 1`,
-			style: style(`${t.name}\\n2 > 1`, t.play ? GREEN : GREY),
+			style: style(`${t.name}\\n$(local:from) > $(local:to)`, t.play ? GREEN : GREY),
+			localVariables: [
+				{ variableType: 'simple', variableName: 'from', startupValue: 2 },
+				{ variableType: 'simple', variableName: 'to', startupValue: 1 },
+				{ variableType: 'simple', variableName: 'layer', startupValue: MAIN_LAYER },
+			],
 			steps: [
 				{
 					down: [
@@ -68,10 +79,10 @@ function takes(presets: CompanionPresetDefinitions<ModuleSchema>): CompanionPres
 							actionId: 'take',
 							options: {
 								server: '',
-								fromChannel: 2,
-								fromLayer: MAIN_LAYER,
-								toChannel: 1,
-								toLayer: MAIN_LAYER,
+								fromChannel: FROM,
+								fromLayer: LAYER,
+								toChannel: TO,
+								toLayer: LAYER,
 								type: t.type,
 								frames: 25,
 								play: t.play,
@@ -88,7 +99,7 @@ function takes(presets: CompanionPresetDefinitions<ModuleSchema>): CompanionPres
 	return {
 		id: 'takes',
 		name: 'Takes',
-		description: 'Change the channels on the button after adding it',
+		description: 'The channels and layer are local variables of the button, so they can be changed after adding it',
 		definitions: [
 			{ id: 'takes_main', type: 'simple', name: 'Channel 2 to channel 1', presets: TAKES.map((t) => `take_${t.id}`) },
 		],
@@ -173,7 +184,7 @@ function layers(
 	return {
 		id: 'layers',
 		name: 'Channels',
-		description: `For layer ${MAIN_LAYER} of each channel. The layer is a local variable of the button`,
+		description: `For layer ${MAIN_LAYER} of each channel of the first server. The channel and layer are local variables of the button`,
 		definitions: groups,
 	}
 }
@@ -219,14 +230,9 @@ function rundowns(
 	const out: CompanionPresetSection<ModuleSchema>[] = []
 	for (const rundown of self.state.rundowns) {
 		const values = self.state
-			.entries()
+			.reachable()
 			.filter((f) => f.rundown === rundown)
-			.flatMap(({ entry }) => {
-				const ref = refOf(entry)
-				const label = choices.get(ref)
-				choices.delete(ref) // one button for each name
-				return label ? [{ name: label, value: ref }] : []
-			})
+			.map(({ entry }) => ({ entry, name: choices.get(refOf(entry)), value: refOf(entry) }))
 		if (!values.length) continue
 		out.push({
 			id: `rundown_${rundown.id}`,
@@ -238,8 +244,10 @@ function rundowns(
 				description: b.note,
 				presetId: `entry_${b.id}`,
 				templateVariableName: 'entry',
-				templateValues: values,
-			})),
+				templateValues: values
+					.filter((v) => b.id !== 'load' || canLoad(v.entry))
+					.map(({ name, value }) => ({ name, value })),
+			})).filter((g) => g.type !== 'template' || g.templateValues.length > 0),
 		})
 	}
 	return out
