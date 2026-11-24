@@ -29,7 +29,7 @@ class LinkError extends Error {
 	}
 }
 
-/** The connection to CasparCG Client's web interface: sign in, live events, and calls. */
+/** The connection to CasparCG Advanced Client's web interface: sign in, live events, and calls. */
 export class Link {
 	readonly #base: string
 	readonly #code: string
@@ -65,17 +65,17 @@ export class Link {
 	/** Ask the client to do something. Throws with its explanation when it refuses. */
 	async call(name: string, args: unknown[], signal?: AbortSignal): Promise<unknown> {
 		const stop = this.#abort?.signal
-		if (!stop || !this.#cookie) throw new Error('Not connected to CasparCG Client')
+		if (!stop || !this.#cookie) throw new Error('Not connected to CasparCG Advanced Client')
 		let res: Response
 		try {
 			res = await this.#post('/call', { client: this.#id, name, args }, signal ? AbortSignal.any([stop, signal]) : stop)
 		} catch (e) {
-			throw new Error(stop.aborted ? 'The connection to CasparCG Client was lost' : reason(e), { cause: e })
+			throw new Error(stop.aborted ? 'The connection to CasparCG Advanced Client was lost' : reason(e), { cause: e })
 		}
 		if (res.status === 401) throw new Error('The access code was changed')
-		if (!res.ok) throw new Error(`CasparCG Client answered ${res.status}`)
+		if (!res.ok) throw new Error(`CasparCG Advanced Client answered ${res.status}`)
 		const reply = (await res.json()) as Reply
-		if (!reply.ok) throw new Error(reply.error || 'CasparCG Client refused')
+		if (!reply.ok) throw new Error(reply.error || 'CasparCG Advanced Client refused')
 		return reply.value
 	}
 
@@ -104,7 +104,7 @@ export class Link {
 				this.#on.state(e.state, e.message)
 				wait = e.retry
 			} else {
-				this.#on.state('failed', abort.signal.aborted ? 'CasparCG Client stopped answering' : reason(e))
+				this.#on.state('failed', abort.signal.aborted ? 'CasparCG Advanced Client stopped answering' : reason(e))
 			}
 		} finally {
 			if (this.#silenceTimer) clearTimeout(this.#silenceTimer)
@@ -123,17 +123,17 @@ export class Link {
 		if (res.status === 429)
 			throw new LinkError('failed', 'Too many wrong access codes. Trying again soon', RETRY_LIMITED)
 		const cookie = /^vt=[0-9a-f]+/.exec(res.headers.get('set-cookie') ?? '')?.[0]
-		if (!res.ok || !cookie) throw new LinkError('failed', 'This does not answer like CasparCG Client')
+		if (!res.ok || !cookie) throw new LinkError('failed', 'This does not answer like CasparCG Advanced Client')
 		this.#cookie = cookie
 		// The web interface of version 1.0 has no such page.
 		const me = await fetch(`${this.#base}/me`, { headers: { Cookie: cookie }, signal })
-		if (!me.ok) throw new LinkError('tooOld', "Canonical's CasparCG Client 1.1.0 or later is needed", 30000)
+		if (!me.ok) throw new LinkError('tooOld', 'CasparCG Advanced Client 1.1.0 or later is needed', 30000)
 		await me.body?.cancel()
 	}
 
 	async #listen(signal: AbortSignal): Promise<void> {
 		const res = await fetch(`${this.#base}/events?c=${this.#id}`, { headers: { Cookie: this.#cookie }, signal })
-		if (!res.ok || !res.body) throw new LinkError('failed', `CasparCG Client answered ${res.status}`)
+		if (!res.ok || !res.body) throw new LinkError('failed', `CasparCG Advanced Client answered ${res.status}`)
 		const text = new TextDecoder()
 		let buffer = ''
 		for await (const chunk of res.body as AsyncIterable<Uint8Array>) {

@@ -113,7 +113,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			name: 'Rundown: play, load, stop …',
 			sortName: 'Rundown 1',
 			description:
-				'Does to a rundown entry what its buttons in CasparCG Client do. Works for playlists, groups and takes too.',
+				'Does to a rundown entry what its buttons in CasparCG Advanced Client do. Works for playlists, groups and takes too.',
 			options: [
 				entry,
 				{
@@ -167,7 +167,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			name: 'Channel: playback overlay',
 			sortName: 'Layer 5',
 			description:
-				'Shows or hides the time left on clips on a channel. It is set up in CasparCG Client, under Channels.',
+				'Shows or hides the time left on clips on a channel. It is set up in CasparCG Advanced Client, under Channels.',
 			options: [
 				server,
 				channelField(self, 'channel', 'Channel', 1),
@@ -191,7 +191,7 @@ export function UpdateActions(self: ModuleInstance): void {
 					await self.command('channel', [device, channel, { overlay: { on } }], context.signal)
 				} catch (e) {
 					if (!(e instanceof Error) || e.message !== 'Unknown call channel') throw e
-					throw new Error('The playback overlay needs CasparCG Client 1.2.0 or later', { cause: e })
+					throw new Error('The playback overlay needs CasparCG Advanced Client 1.2.0 or later', { cause: e })
 				}
 			},
 		},

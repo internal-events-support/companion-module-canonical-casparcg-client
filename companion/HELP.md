@@ -1,12 +1,12 @@
-# Canonical: CasparCG Client
+# nerif-tafu: CasparCG Advanced Client
 
-Controls Canonical's CasparCG Client: rundown entries, playlists, takes between channels, and any layer.
+Controls CasparCG Advanced Client: rundown entries, playlists, takes between channels, and any layer.
 
 This is **not** for the original CasparCG Client (version 2.x), and not for a CasparCG server directly.
 
 ## Setup
 
-This module needs **Canonical's CasparCG Client 1.1.0 or later** and Companion 5.0 or later. The client comes from Canonical's internal events team.
+This module needs **CasparCG Advanced Client 1.1.0 or later** and Companion 5.0 or later. Up to 1.2.0 the client was called CasparCG Client.
 
 1. In the client open **Settings > Web Interface** and turn the web interface on.
 2. If Companion runs on another computer, also turn on **Allow other devices**.
@@ -98,18 +98,18 @@ In the name of an entry's variables, anything in the remote ID but letters, numb
 
 These are shown as the status of the connection:
 
-| Status                                                          | What to do                                                                                               |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Enter the address and port of CasparCG Client                   | Fill in the settings                                                                                     |
-| Enter only the address, without http:// or a port               | Put the port in its own setting                                                                          |
-| Enter the access code                                           | Fill in the access code                                                                                  |
-| Wrong access code                                               | Enter the code from Settings > Web Interface. The module does not try again until the settings are saved |
-| Too many wrong access codes. Trying again soon                  | Wait a minute                                                                                            |
-| Nothing is listening there. Is the web interface on?            | Start the client, turn on its web interface, and check the port                                          |
-| That address was not found                                      | Check the address                                                                                        |
-| This does not answer like CasparCG Client                       | Something else is using that port. Check the address and port                                            |
-| Canonical's CasparCG Client 1.1.0 or later is needed            | Update the client                                                                                        |
-| CasparCG Client stopped answering, or The connection was closed | The client was closed or the network dropped. The module keeps trying                                    |
+| Status                                                                   | What to do                                                                                               |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Enter the address and port of CasparCG Advanced Client                   | Fill in the settings                                                                                     |
+| Enter only the address, without http:// or a port                        | Put the port in its own setting                                                                          |
+| Enter the access code                                                    | Fill in the access code                                                                                  |
+| Wrong access code                                                        | Enter the code from Settings > Web Interface. The module does not try again until the settings are saved |
+| Too many wrong access codes. Trying again soon                           | Wait a minute                                                                                            |
+| Nothing is listening there. Is the web interface on?                     | Start the client, turn on its web interface, and check the port                                          |
+| That address was not found                                               | Check the address                                                                                        |
+| This does not answer like CasparCG Advanced Client                       | Something else is using that port. Check the address and port                                            |
+| CasparCG Advanced Client 1.1.0 or later is needed                        | Update the client                                                                                        |
+| CasparCG Advanced Client stopped answering, or The connection was closed | The client was closed or the network dropped. The module keeps trying                                    |
 
 Other things:
 

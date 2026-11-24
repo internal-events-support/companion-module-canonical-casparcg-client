@@ -1,4 +1,4 @@
-// What CasparCG Client says, and what can be worked out from it. Nothing here talks to the client.
+// What CasparCG Advanced Client says, and what can be worked out from it. Nothing here talks to the client.
 
 export type Entry = {
 	id: string

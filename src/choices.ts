@@ -61,7 +61,7 @@ export function serverField(self: ModuleInstance): CompanionInputFieldDropdown<'
 		choices: serverChoices(self),
 		default: '',
 		allowCustom: true,
-		expressionDescription: 'The name of a server in CasparCG Client. Empty = the first one',
+		expressionDescription: 'The name of a server in CasparCG Advanced Client. Empty = the first one',
 	}
 }
 

@@ -293,7 +293,7 @@ function overlays(self: ModuleInstance, presets: Presets): Section {
 	return {
 		id: 'overlays',
 		name: 'Playback overlays',
-		description: 'Needs CasparCG Client 1.2.0 or later',
+		description: 'Needs CasparCG Advanced Client 1.2.0 or later',
 		definitions: [
 			{
 				id: 'overlays_channels',

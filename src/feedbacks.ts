@@ -267,7 +267,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			name: 'CasparCG server is connected',
 			sortName: 'Server 1',
 			description:
-				'Whether CasparCG Client is connected to its server, not whether Companion is connected to the client.',
+				'Whether CasparCG Advanced Client is connected to its server, not whether Companion is connected to the client.',
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [server],
 			callback: ({ options }) => {

@@ -95,14 +95,16 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#mustBeReady()
 		const server = this.state.server(name)
 		if (!this.state.live.devices.some((s) => s.name === server)) {
-			throw new Error(name ? `CasparCG Client has no server called "${name}"` : 'CasparCG Client has no servers')
+			throw new Error(
+				name ? `CasparCG Advanced Client has no server called "${name}"` : 'CasparCG Advanced Client has no servers',
+			)
 		}
 		return server
 	}
 
 	/** Ask the client to do something. */
 	async command(name: string, args: unknown[], signal: AbortSignal): Promise<unknown> {
-		if (!this.#link) throw new Error('Not connected to CasparCG Client')
+		if (!this.#link) throw new Error('Not connected to CasparCG Advanced Client')
 		return this.#link.call(name, args, signal)
 	}
 
@@ -145,14 +147,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	#mustBeReady(): void {
-		if (!this.#ready) throw new Error('Not connected to CasparCG Client')
+		if (!this.#ready) throw new Error('Not connected to CasparCG Advanced Client')
 	}
 
 	#connect(config: ModuleConfig, secrets: ModuleSecrets): void {
 		const host = config.host?.trim().replace(/^\[(.*)\]$/, '$1')
 		const code = secrets?.code?.trim()
 		if (!host || !config.port) {
-			this.updateStatus(InstanceStatus.BadConfig, 'Enter the address and port of CasparCG Client')
+			this.updateStatus(InstanceStatus.BadConfig, 'Enter the address and port of CasparCG Advanced Client')
 			return
 		}
 		if (!/^[\p{L}\p{N}._-]+$/u.test(host) && (!isIPv6(host) || host.includes('%'))) {
@@ -184,7 +186,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	#linkState(state: LinkState, message?: string): void {
 		this.updateStatus(STATUS[state], message)
-		if (state === 'ok') this.log('info', `Connected to CasparCG Client ${this.state.version}`)
+		if (state === 'ok') this.log('info', `Connected to CasparCG Advanced Client ${this.state.version}`)
 		else if (state === 'connecting') this.log('debug', 'Connecting')
 		else this.log(this.#ready ? 'warn' : 'debug', message ?? state)
 		if (state === 'ok' || !this.#ready) return

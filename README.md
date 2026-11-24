@@ -1,6 +1,6 @@
-# companion-module-canonical-casparcg-client
+# companion-module-nerif-tafu-casparcgadvancedclient
 
-A [Bitfocus Companion](https://bitfocus.io/companion) module for Canonical's CasparCG Client: rundowns, playlists, takes and layers. It is not for the original CasparCG Client (2.x), or for a CasparCG server directly.
+A [Bitfocus Companion](https://bitfocus.io/companion) module for CasparCG Advanced Client by nerif-tafu: rundowns, playlists, takes and layers. It is not for the original CasparCG Client (2.x), or for a CasparCG server directly.
 
 See [HELP.md](./companion/HELP.md) and [LICENSE](./LICENSE)
 

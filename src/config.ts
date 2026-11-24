@@ -17,13 +17,13 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Information',
 			width: 12,
 			value:
-				"Needs Canonical's CasparCG Client 1.1.0 or later, which is not the original CasparCG Client (2.x). The port and access code are in its Settings, under Web Interface. If Companion runs on another computer, turn on 'Allow other devices' there too.",
+				"Needs CasparCG Advanced Client 1.1.0 or later, which is not the original CasparCG Client (2.x). The port and access code are in its Settings, under Web Interface. If Companion runs on another computer, turn on 'Allow other devices' there too.",
 		},
 		{
 			type: 'textinput',
 			id: 'host',
 			label: 'Address',
-			description: 'IP address or name of the computer running CasparCG Client',
+			description: 'IP address or name of the computer running CasparCG Advanced Client',
 			width: 8,
 			default: '127.0.0.1',
 			minLength: 1,

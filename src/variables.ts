@@ -109,7 +109,7 @@ export class Variables {
 		if (key === this.#defined) return
 		this.#defined = key
 		const all: CompanionVariableDefinitions<VariablesSchema> = {
-			client_version: { name: 'Version of CasparCG Client' },
+			client_version: { name: 'Version of CasparCG Advanced Client' },
 			rundowns: { name: 'Open rundowns' },
 			servers: { name: 'Number of CasparCG servers' },
 			servers_connected: { name: 'Number of CasparCG servers connected' },
